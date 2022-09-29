@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Bouncing Balls</title>
+  </head>
+  <body style="margin: 0; overflow: hidden; height: 100%">
+    <span id="datgui" style="position: absolute; top: 0rem; left: 0rem"></span>
+
+    <script type="module">
+      import * as THREE from "../modules/three.module.js";
+      import { OrbitControls } from "../modules/OrbitControls.js";
+      import { GUI } from "../modules/dat.gui.module.js";
+      import Stats from "../modules/stats.module.js";
+
+      let scene, camera, renderer, dirLight, controls, stats, container, ball;
+      let balls = [];
+
+      let config = {
+        numBalls: 100,
+        radius: 2,
+        velScalar: 2.0,
+        lightIntensity: 0.5,
+        cubeSize: 1,
+        cubeOpacity: 0.2,
+        cubeColor: [150, 150, 150],
+      };
+
+      // SETUP
+      initScene();
+      skybox();
+      initLights();
+      controller();
+      statDisplay();
+      datGUI();
+      initBalls();
+      animate();
+
+      function initScene() {
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(
+          60,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1500
+        );
+        camera.position.set(100, 50, -100);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputEncoing = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+      }
+
+      function skybox() {
+        scene.background = new THREE.CubeTextureLoader()
+          .setPath("../skybox/")
+          .load([
+            "bkg1_right.png",
+            "bkg1_left.png",
+            "bkg1_top.png",
+            "bkg1_bot.png",
+            "bkg1_front.png",
+            "bkg1_back.png",
+          ]);
+      }
+
+      function initLights() {
+        dirLight = new THREE.DirectionalLight(0xffffff, config.lightIntensity);
+        dirLight.position.set(1, 2, -1);
+        scene.add(dirLight);
+      }
+
+      function controller() {
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 1000;
+      }
+
+      function statDisplay() {
+        stats = new Stats();
+        document.body.appendChild(stats.dom);
+      }
+
+      function datGUI() {
+        const gui = new GUI({ autoPlace: false, width: 300 });
+        let guiSpan = document.getElementById("datgui");
+        guiSpan.appendChild(gui.domElement);
+
+        gui
+          .add(config, "numBalls", 0, 100, 1)
+          .name("number of balls")
+          .onChange(initBalls);
+
+        gui
+          .add(config, "radius", 0.5, 5, 0.1)
+          .name("radius")
+          .onChange(initBalls);
+
+        gui
+          .add(config, "velScalar", 0, 5, 0.01)
+          .name("velocity scalar")
+          .onChange(initBalls);
+
+        gui
+          .add(config, "lightIntensity", 0, 1, 0.01)
+          .name("light intensity")
+          .onChange(changeLight);
+
+        gui
+          .add(config, "cubeSize", 0.2, 5, 0.1)
+          .name("container size")
+          .onChange(changeSize);
+
+        gui
+          .add(config, "cubeOpacity", 0, 1, 0.01)
+          .name("opacity")
+          .onChange(changeOpacity);
+
+        gui
+          .addColor(config, "cubeColor", 0, 1, 0.01)
+          .name("cube color")
+          .onChange(changeColor);
+      }
+
+      function changeLight() {
+        dirLight.intensity = config.lightIntensity;
+      }
+
+      function changeSize() {
+        container.scale.set(config.cubeSize, config.cubeSize, config.cubeSize);
+      }
+
+      function changeOpacity() {
+        container.material.opacity = config.cubeOpacity;
+      }
+
+      function changeColor() {
+        container.material.color = new THREE.Color(
+          config.cubeColor[0] / 255,
+          config.cubeColor[1] / 255,
+          config.cubeColor[2] / 255
+        );
+      }
+
+      function initBalls() {
+        disposeMeshes();
+
+        createContainer();
+
+        let ballGeom = new THREE.SphereGeometry(
+          config.radius,
+          config.radius * 16,
+          config.radius * 16
+        );
+
+        for (let i = 0; i < config.numBalls; i++) {
+          createBall(ballGeom, Math.random() * 0xffffff, 0, 1, 0);
+        }
+      }
+
+      function disposeMeshes() {
+        const meshes = [];
+
+        scene.traverse(function (object) {
+          if (object.isMesh) meshes.push(object);
+        });
+
+        for (let i = 0; i < meshes.length; i++) {
+          const mesh = meshes[i];
+          mesh.material.dispose();
+          mesh.geometry.dispose();
+          scene.remove(mesh);
+        }
+      }
+
+      function createContainer() {
+        container = new THREE.Mesh(
+          new THREE.BoxGeometry(100, 100, 100),
+          new THREE.MeshStandardMaterial({
+            transparent: true,
+            opacity: config.cubeOpacity,
+          })
+        );
+
+        container.position.set(0, 0, 0);
+        container.scale.set(config.cubeSize, config.cubeSize, config.cubeSize);
+        container.material.color = new THREE.Color(
+          config.cubeColor[0] / 255,
+          config.cubeColor[1] / 255,
+          config.cubeColor[2] / 255
+        );
+
+        scene.add(container);
+      }
+
+      function createBall(ballGeom, color, x, y, z) {
+        ball = new THREE.Mesh(
+          ballGeom,
+          new THREE.MeshStandardMaterial({ color: color })
+        );
+        ball.position.set(x, y, z);
+
+        ball.userData.vel = new THREE.Vector3().randomDirection();
+        ball.userData.vel.multiplyScalar(config.velScalar);
+
+        balls.push(ball);
+        scene.add(ball);
+      }
+
+      function animate() {
+        if (controls) controls.update();
+        if (stats) stats.update();
+
+        render();
+
+        checkEdges();
+
+        renderer.render(scene, camera);
+
+        requestAnimationFrame(animate);
+      }
+
+      function render() {
+        balls.forEach((b) => {
+          b.position.add(b.userData.vel);
+        });
+      }
+
+      function checkEdges() {
+        let nedge = -50 * container.scale.x + config.radius;
+        let edge = 50 * container.scale.x - config.radius;
+
+        let offset = config.radius * 0.5;
+
+        balls.forEach((b) => {
+          if (b.position.x < nedge) {
+            b.position.x += offset;
+            b.userData.vel.x *= -1;
+          } else if (b.position.x > edge) {
+            b.position.x -= offset;
+            b.userData.vel.x *= -1;
+          }
+
+          if (b.position.y < nedge) {
+            b.position.y += offset;
+            b.userData.vel.y *= -1;
+          } else if (b.position.y > edge) {
+            b.position.y -= offset;
+            b.userData.vel.y *= -1;
+          }
+
+          if (b.position.z < nedge) {
+            b.position.z += offset;
+            b.userData.vel.z *= -1;
+          } else if (b.position.z > edge) {
+            b.position.z -= offset;
+            b.userData.vel.z *= -1;
+          }
+        });
+      }
+
+      function resize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      window.addEventListener("resize", resize, false);
+    </script>
+  </body>
+</html>
