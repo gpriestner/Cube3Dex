@@ -10,10 +10,10 @@
     <span id="datgui" style="position: absolute; top: 0rem; left: 0rem"></span>
 
     <script type="module">
-      import * as THREE from "/Cube3Dex/modules/three.module.js";
-      import { OrbitControls } from "/Cube3Dex/modules/OrbitControls.js";
-      import { GUI } from "/Cube3Dex/modules/dat.gui.module.js";
-      import Stats from "/Cube3Dex/modules/stats.module.js";
+      import * as THREE from "./Cube3Dex/modules/three.module.js";
+      import { OrbitControls } from "./Cube3Dex/modules/OrbitControls.js";
+      import { GUI } from "./Cube3Dex/modules/dat.gui.module.js";
+      import Stats from "./Cube3Dex/modules/stats.module.js";
 
       let scene, camera, renderer, dirLight, controls, stats, container, ball;
       let balls = [];
@@ -58,7 +58,7 @@
 
       function skybox() {
         scene.background = new THREE.CubeTextureLoader()
-          .setPath("/Cube3Dex/skybox/")
+          .setPath("./Cube3Dex/skybox/")
           .load([
             "bkg1_right.png",
             "bkg1_left.png",
