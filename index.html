@@ -11,17 +11,28 @@
 
     <script type="module">
       import * as THREE from "./modules/three.module.js";
+      import { LightningStrike } from "./modules/LightningStrike.js";
       import { OrbitControls } from "./modules/OrbitControls.js";
       import { GUI } from "./modules/dat.gui.module.js";
       import Stats from "./modules/stats.module.js";
 
-      let scene, camera, renderer, dirLight, controls, stats, container, ball;
-      let balls = [];
+      let scene,
+        camera,
+        renderer,
+        dirLight,
+        controls,
+        stats,
+        container,
+        ball,
+        step,
+        balls;
+
+      let strikes, lightningStrikeMesh, lightningStrike, lightningMaterial;
 
       let config = {
-        numBalls: 100,
-        radius: 2,
-        velScalar: 2.0,
+        numBalls: 10,
+        radius: 4,
+        velScalar: 0.2,
         lightIntensity: 0.5,
         cubeSize: 1,
         cubeOpacity: 0.2,
@@ -29,6 +40,11 @@
       };
 
       // SETUP
+
+      let time = 0;
+      const timeRate = 1;
+      const clock = new THREE.Clock();
+
       initScene();
       skybox();
       initLights();
@@ -149,7 +165,9 @@
       }
 
       function initBalls() {
+        step = 0;
         disposeMeshes();
+        balls = [];
 
         createContainer();
 
@@ -162,6 +180,23 @@
         for (let i = 0; i < config.numBalls; i++) {
           createBall(ballGeom, Math.random() * 0xffffff, 0, 1, 0);
         }
+
+        const rayParams = {
+          sourceOffset: balls[1].position,
+          destOffset: balls[2].position,
+          radius0: 0.5,
+          radius1: 0.5,
+          isEternal: true,
+        };
+
+        lightningStrike = new LightningStrike(rayParams);
+        lightningMaterial = new THREE.MeshBasicMaterial({ color: 0xb0ffff });
+        lightningStrikeMesh = new THREE.Mesh(
+          lightningStrike,
+          lightningMaterial
+        );
+
+        scene.add(lightningStrikeMesh);
       }
 
       function disposeMeshes() {
@@ -205,7 +240,7 @@
           new THREE.MeshStandardMaterial({ color: color })
         );
         ball.position.set(x, y, z);
-
+        ball.userData.isDead = false;
         ball.userData.vel = new THREE.Vector3().randomDirection();
         ball.userData.vel.multiplyScalar(config.velScalar);
 
@@ -214,12 +249,22 @@
       }
 
       function animate() {
+        step += 1;
         if (controls) controls.update();
         if (stats) stats.update();
+
+        let d = clock.getDelta();
+        time += timeRate * d;
+
+        lightningStrike.update(time);
 
         render();
 
         checkEdges();
+
+        if (step > 500) {
+          checkCollisions();
+        }
 
         renderer.render(scene, camera);
 
@@ -236,33 +281,66 @@
         let nedge = -50 * container.scale.x + config.radius;
         let edge = 50 * container.scale.x - config.radius;
 
-        let offset = config.radius * 0.5;
+        // let offset = config.radius * 0.5;
 
         balls.forEach((b) => {
           if (b.position.x < nedge) {
-            b.position.x += offset;
+            b.position.x = nedge; // += offset;
             b.userData.vel.x *= -1;
           } else if (b.position.x > edge) {
-            b.position.x -= offset;
+            b.position.x = edge; // -= offset;
             b.userData.vel.x *= -1;
           }
 
           if (b.position.y < nedge) {
-            b.position.y += offset;
+            b.position.y = nedge; // += offset;
             b.userData.vel.y *= -1;
           } else if (b.position.y > edge) {
-            b.position.y -= offset;
+            b.position.y = edge; // -= offset;
             b.userData.vel.y *= -1;
           }
 
           if (b.position.z < nedge) {
-            b.position.z += offset;
+            b.position.z = nedge; // += offset;
             b.userData.vel.z *= -1;
           } else if (b.position.z > edge) {
-            b.position.z -= offset;
+            b.position.z = edge; // -= offset;
             b.userData.vel.z *= -1;
           }
         });
+      }
+
+      function checkCollisions() {
+        const minDist = (config.radius * 2) ** 2;
+        if (balls.length > 1)
+          for (let i = 0; i < balls.length - 1; i++) {
+            for (let j = i + 1; j < balls.length - 1; j++) {
+              const b1 = balls[i];
+              const b2 = balls[j];
+
+              const x = (b1.position.x - b2.position.x) ** 2;
+              const y = (b1.position.y - b2.position.y) ** 2;
+              const z = (b1.position.z - b2.position.z) ** 2;
+
+              const dist = x + y + z;
+
+              if (dist < minDist) {
+                b1.userData.isDead = true;
+                b2.userData.isDead = true;
+              }
+            }
+          }
+
+        for (let i = balls.length - 1; i >= 0; i--) {
+          const ball = balls[i];
+          if (ball.userData.isDead) {
+            ball.material.dispose();
+            ball.geometry.dispose();
+            scene.remove(ball);
+            //balls.splice(i, 1);
+          }
+        }
+        balls = balls.filter((b) => !b.userData.isDead);
       }
 
       function resize() {
